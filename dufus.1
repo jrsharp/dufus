@@ -1,0 +1,52 @@
+.TH DUFUS 1
+.SH NAME
+dufus \- disk usage for us
+.SH SYNOPSIS
+.B dufus
+[
+.I directory
+]
+.SH DESCRIPTION
+.I Dufus
+(disk usage for us) is a simple disk usage analysis tool for Plan 9.
+It provides a graphical breakdown of the on-disk usage of files and directories,
+allowing the user to visualize which files and directories are consuming
+the most space.
+.PP
+If no
+.I directory
+is specified,
+.I dufus
+analyzes the current directory.
+.PP
+The visualization is a treemap representation where rectangles represent files 
+and directories, with the size of each rectangle proportional to the file or 
+directory size. Directories are shown in a hierarchical manner, allowing 
+the user to navigate through the filesystem structure.
+.PP
+.I Dufus
+adheres to Plan 9 design principles of simplicity and modularity, doing only 
+the essential tasks of collecting file/directory usage information and providing 
+a basic visualization that summarizes this data.
+.SH USAGE
+.PP
+Click on a directory to navigate into it. Navigation keys:
+.TP
+.B q
+Quit the application
+.TP
+.B o
+Open/reload the current directory
+.TP
+.B u
+Navigate up to the parent directory
+.TP
+.B r
+Return to the root directory
+.SH SOURCE
+.B /sys/src/cmd/dufus
+.SH SEE ALSO
+.IR du (1),
+.IR ls (1)
+.SH BUGS
+Report bugs to the Plan 9 mailing list. 
