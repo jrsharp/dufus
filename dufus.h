@@ -1,10 +1,3 @@
-#include <u.h>
-#include <libc.h>
-#include <draw.h>
-#include <event.h>
-#include <keyboard.h>
-#include <thread.h>
-
 /* Application modes */
 enum {
 	NORMAL = 0,
@@ -13,11 +6,9 @@ enum {
 };
 
 /* File size multipliers */
-enum {
-	KB = 1024,
-	MB = 1024*1024,
-	GB = 1024*1024*1024
-};
+#define KB 1024ULL
+#define MB (KB*1024ULL)
+#define GB (MB*1024ULL)
 
 /* Structure for file/directory information */
 typedef struct FsNode {
@@ -30,8 +21,8 @@ typedef struct FsNode {
 	int nchildren;
 	int maxchildren;
 	Rectangle bounds;  /* Display rectangle */
-	int selected;      /* Selection state */
 	Image *color;      /* Display color */
+	int id;            /* Unique ID for this node */
 } FsNode;
 
 /* Global variables */
@@ -55,23 +46,48 @@ extern Image *file_color;  /* Files */
 extern Image *dir_color;   /* Directories */
 extern Image *accent;      /* Accent */
 
+/* Pre-rendered icons */
+extern Image *file_icon;   /* File icon image */
+extern Image *dir_icon;    /* Directory icon image */
+
 /* Function prototypes */
-void setupdraw(void);
-void initcolors(void);
+void setup_draw(void);
+void init_colors(void);
+void calculate_layout(void);
+void draw_header(void);
+void draw_footer(void);
+void draw_treemap(void);
+void draw_node(FsNode *node, int highlight_it);
+void draw_ui(void);
+void layout_treemap(FsNode *node, Rectangle avail);
+
 void scan_directory(char *path, FsNode *parent);
 FsNode* create_fsnode(char *name, char *path, u64int size, int isdir, FsNode *parent);
 void add_child(FsNode *parent, FsNode *child);
 void clear_fsnode(FsNode *node);
-void layout_nodes(FsNode *node, Rectangle avail);
-void draw_interface(void);
-void draw_fsnode(FsNode *node);
-void draw_status_bar(void);
+void open_directory(char *path);
+
 void navigate(Rune key);
-void switchmode(int newmode);
-void handlekey(Rune key, Event *ev);
-void resdraw(void);
+void handle_key(Rune key);
+void update_status(char *fmt, ...);
 void eresized(int new);
 void usage(void);
+
 FsNode* find_node_at_point(FsNode *node, Point p);
 char* format_size(u64int size);
-void update_status(char *fmt, ...);
+
+/* File system operations */
+FsNode* create_fsnode(char *name, char *path, u64int size, int isdir, FsNode *parent);
+void add_child(FsNode *parent, FsNode *child);
+void scan_directory(char *path, FsNode *parent);
+void clear_fsnode(FsNode *node);
+void sort_nodes_by_size(FsNode *parent);
+void open_directory(char *path);
+
+/* Navigation functions */
+void navigate_up(void);
+void navigate_to_selected(void);
+int find_list_item_at_point(Point p);
+
+/* UI functions */
+char* format_size(u64int size);

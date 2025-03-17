@@ -11,6 +11,10 @@ underlying filesystem services and merely providing a basic libdraw visualizatio
 that summarizes this data and allows the user to navigate their filesystem
 visually.
 
-A primary use case is for allowing the user to see what things can be removed
-to make room for new data.
+It looks like this:
 
+![dufus screenshot](dufus_screenshot.png)
+
+Bugs:
+
+yeah, we've got 'em.

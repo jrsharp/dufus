@@ -18,31 +18,108 @@ If no
 is specified,
 .I dufus
 analyzes the current directory.
+The
+.I directory
+argument specifies the top-level or root directory from which to start the analysis.
+This is useful for examining specific portions of the filesystem.
 .PP
-The visualization is a treemap representation where rectangles represent files 
-and directories, with the size of each rectangle proportional to the file or 
-directory size. Directories are shown in a hierarchical manner, allowing 
-the user to navigate through the filesystem structure.
+The visualization consists of two main components:
+.TP
+.B List View
+An interactive file list showing directories and files with their respective sizes
+and icons for clear visual distinction.
+.TP
+.B Treemap View
+A treemap representation where rectangles represent files and directories,
+with the size of each rectangle proportional to the file or directory size.
 .PP
 .I Dufus
 adheres to Plan 9 design principles of simplicity and modularity, doing only 
 the essential tasks of collecting file/directory usage information and providing 
 a basic visualization that summarizes this data.
+.SH INTERFACE
+.PP
+The application window has three main sections:
+.TP
+.B File List
+The upper pane displaying files and directories in a list format with icons
+and size information.
+.TP
+.B Treemap Visualization
+The lower pane showing files and directories as proportionally-sized rectangles.
+Directories and files are distinctly colored, and the selected item is highlighted.
+.TP
+.B Status Bar
+Shows current path and total size information at the bottom of the window.
 .SH USAGE
 .PP
-Click on a directory to navigate into it. Navigation keys:
+Navigation can be done with both mouse and keyboard:
+.TP
+.B Mouse
+Click on list items to select them. Double-click on a directory to navigate into it.
+Click on items in the treemap to select them in the list.
+.TP
+.B Keyboard Navigation
 .TP
 .B q
 Quit the application
 .TP
 .B o
-Open/reload the current directory
+Open directory
 .TP
-.B u
-Navigate up to the parent directory
+.B u or h
+Navigate up to the parent directory (vim-style for h)
 .TP
 .B r
 Return to the root directory
+.TP
+.B j
+Move selection down (vim-style)
+.TP
+.B k
+Move selection up (vim-style)
+.TP
+.B l or Enter
+Navigate into selected directory (vim-style for l)
+.TP
+.B ?
+Toggle help display
+.SH COLOR CODING
+.PP
+The visualization uses colors to differentiate between item types:
+.TP
+.B Light blue
+Directories (both in list and treemap)
+.TP
+.B White/light steel blue
+Files (in list and treemap respectively)
+.TP
+.B Sky blue
+Currently selected item
+.SH VISUAL ELEMENTS
+.PP
+.TP
+.B Directory Icon
+Folders are represented by a folder icon in the list
+.TP
+.B File Icon
+Files are represented by a document icon in the list
+.TP
+.B Background Color
+Directories have a light blue background to further distinguish them from files
+.SH EXAMPLES
+.PP
+To analyze the current directory:
+.IP
+.EX
+dufus
+.EE
+.PP
+To analyze a specific directory:
+.IP
+.EX
+dufus /usr/glenda/docs
+.EE
 .SH SOURCE
 .B /sys/src/cmd/dufus
 .SH SEE ALSO
