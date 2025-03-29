@@ -26,8 +26,15 @@ enum {
 	HELP_STATE = 1,
 	
 	/* Split ratio (percentage of height for treemap pane vs list pane) */
-	SPLIT_RATIO = 15       /* Treemap now uses 15% of available space */
+	SPLIT_RATIO = 60,      /* Treemap now uses 60% of available space */
+	
+	/* Visualization parameters */
+	MAX_DEPTH_LEVEL = 8,   /* Maximum recursion depth to visualize differently */
+	FRACTAL_PADDING = 2    /* Spacing between elements */
 };
+
+/* Version string */
+char *VERSION = "0.2";
 
 /* Colors */
 Image *back;           /* Background color */
@@ -41,6 +48,7 @@ Image *splitter_color; /* Splitter color */
 Image *list_bg;        /* List background */
 Image *list_sel_bg;    /* List selected item background */
 Image *list_dir_bg;    /* List directory item background */
+Image *depth_colors[8]; /* Array of colors for depth levels */
 
 /* Pre-rendered icons */
 Image *file_icon;      /* File icon image */
@@ -125,24 +133,30 @@ create_file_icon(void)
 void
 init_colors(void)
 {
-	back = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xFFFFF0FF);  /* Light cream background (like mindthemap) */
-	footer_bg = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xE0E8F0FF);  /* Light steel blue for footer (like mindthemap) */
-	dir_color = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xB0E0FFFF);  /* Sky blue for directories (like mindthemap) */
-	file_color = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xE0E8F0FF);  /* Light steel blue for files */
-	highlight = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0x90C0F0FF);  /* Darker sky blue for highlights */
-	text_color = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0x000000FF);  /* Black for text */
-	border_color = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0x000066FF);  /* Navy blue for borders (like mindthemap) */
-	splitter_color = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0x000066FF);  /* Navy blue for splitter */
-	list_bg = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xFFFFFFFF);  /* White for list background */
-	list_sel_bg = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xB0E0FFFF);  /* Sky blue for selected item */
-	list_dir_bg = allocimage(display, Rect(0,0,1,1), screen->chan, 1, 0xF0F8FFFF);  /* Light sky blue for directory items */
+	/* Create standard colors */
+	back = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x1a1a1aFF);  /* Darker background */
+	footer_bg = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x333333FF);  /* Dark gray footer */
+	dir_color = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x4169E1FF);  /* Royal Blue for directories */
+	file_color = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x87CEEBFF);  /* Sky Blue for files */
+	highlight = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0xFFD700FF);  /* Gold highlight */
+	text_color = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0xE0E0E0FF);  /* Light gray text */
+	border_color = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x555555FF);  /* Medium gray border */
+	splitter_color = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x444444FF);  /* Dark gray splitter */
+	list_bg = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x2A2A2AFF);  /* Slightly lighter than background */
+	list_sel_bg = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x3F3F3FFF);  /* Selected item background */
+	list_dir_bg = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x2D2D4FFF);  /* Directory item background */
 	
-	if(back == nil || footer_bg == nil || dir_color == nil || file_color == nil || 
-	   highlight == nil || text_color == nil || border_color == nil || 
-	   splitter_color == nil || list_bg == nil || list_sel_bg == nil || list_dir_bg == nil)
-		sysfatal("allocimage failed: %r");
+	/* Create depth-based visualization colors - gradient from cool to warm colors */
+	depth_colors[0] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x4B0082FF);  /* Indigo */
+	depth_colors[1] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x0000CDFF);  /* Medium Blue */
+	depth_colors[2] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x1E90FFFF);  /* Dodger Blue */
+	depth_colors[3] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x00CED1FF);  /* Dark Turquoise */
+	depth_colors[4] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0x00FF7FFF);  /* Spring Green */
+	depth_colors[5] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0xFFFF00FF);  /* Yellow */
+	depth_colors[6] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0xFF7F00FF);  /* Orange */
+	depth_colors[7] = allocimage(display, Rect(0, 0, 1, 1), screen->chan, 1, 0xFF0000FF);  /* Red */
 	
-	/* Create pre-rendered icons */
+	/* Create icons */
 	create_file_icon();
 	create_dir_icon();
 }
@@ -171,11 +185,22 @@ calculate_layout(void)
 	/* Calculate content area height (excluding footer) */
 	content_height = Dy(screenbounds) - FOOTER_HEIGHT;
 	
-	/* Calculate treemap height (lower pane) - percentage of content height */
-	treemap_height = (content_height * SPLIT_RATIO) / 100;
+	/* Calculate heights for each pane based on split ratio */
+	list_height = (content_height * (100 - SPLIT_RATIO)) / 100;
 	
-	/* Calculate list height (upper pane) - remaining content height */
-	list_height = content_height - treemap_height - SPLITTER_HEIGHT;
+	/* Ensure minimum list height */
+	if(list_height < LISTITEM_HEIGHT * 3)
+		list_height = LISTITEM_HEIGHT * 3;
+	
+	/* Calculate treemap height based on remaining space */
+	treemap_height = content_height - list_height - SPLITTER_HEIGHT;
+	
+	/* Ensure minimum treemap height */
+	if(treemap_height < 100) {
+		treemap_height = 100;
+		/* Recalculate list height if needed */
+		list_height = content_height - treemap_height - SPLITTER_HEIGHT;
+	}
 	
 	/* Calculate list rectangle (upper pane) */
 	list_rect = Rect(
@@ -201,10 +226,19 @@ calculate_layout(void)
 		visible_items = 1;
 }
 
+/* Return the minimum of two integers */
+int
+min(int a, int b)
+{
+	return a < b ? a : b;
+}
+
 /* Draw the footer status bar */
 void
 draw_footer(void)
 {
+	char version_str[32];
+	
 	/* Draw footer background */
 	draw(screen, footer_rect, footer_bg, nil, ZP);
 	
@@ -219,8 +253,15 @@ draw_footer(void)
 	
 	/* Proper vertical centering for footer text */
 	int text_y = footer_rect.min.y + (FOOTER_HEIGHT - font->height) / 2;
+	
+	/* Left-aligned status message */
 	string(screen, Pt(footer_rect.min.x + PADDING, text_y), 
 		text_color, ZP, font, status_message);
+	
+	/* Right-aligned version string */
+	snprint(version_str, sizeof(version_str), "dufus %s", VERSION);
+	string(screen, Pt(footer_rect.max.x - PADDING - stringwidth(font, version_str), text_y),
+		text_color, ZP, font, version_str);
 }
 
 /* Draw the splitter between panes */
@@ -376,24 +417,26 @@ draw_file_list(void)
 	}
 }
 
-/* Simple treemap layout algorithm - slice-and-dice style for reliability */
+/* Enhanced treemap layout algorithm - designed to show recursive patterns */
 void
-layout_treemap(FsNode *node, Rectangle avail)
+layout_treemap(FsNode *node, Rectangle avail, int depth)
 {
+	double total_size;
+	double aspect;
 	int i;
-	double total_size = 0;
-	int remaining;
-	int pos;
-	Rectangle r;
-	int horiz = Dx(avail) > Dy(avail);
 	
-	if(node == nil || node->nchildren == 0)
+	if(node == nil || node->nchildren == 0 || depth > MAX_DEPTH_LEVEL)
+		return;
+	
+	/* Ensure minimum rectangle size */
+	if(Dx(avail) < MINBOX || Dy(avail) < MINBOX)
 		return;
 	
 	/* Store the available rectangle as this node's bounds */
 	node->bounds = avail;
 	
 	/* Calculate total size of all children */
+	total_size = 0;
 	for(i = 0; i < node->nchildren; i++)
 		total_size += (double)node->children[i]->size;
 	
@@ -404,75 +447,187 @@ layout_treemap(FsNode *node, Rectangle avail)
 			node->children[i]->size = 1;
 	}
 	
-	/* Position nodes horizontally or vertically based on aspect ratio */
-	if(horiz) {
-		/* Horizontal layout */
-		pos = avail.min.x;
-		remaining = Dx(avail);
-		
+	/* Select layout pattern based on aspect ratio */
+	aspect = (double)Dx(avail) / Dy(avail);
+	
+	/* Simple layout based on aspect ratio */
+	if(aspect >= 1.0) {
+		/* Horizontal layout for wide rectangles */
+		layout_horizontal(node, avail, total_size);
+	} else {
+		/* Vertical layout for tall rectangles */
+		layout_vertical(node, avail, total_size);
+	}
+	
+	/* Recursively layout children with proper padding, but only up to a certain depth
+	 * to avoid going too deep and making the visualization too complex */
+	if(depth < 2) {  /* We show the top few levels in full detail */
 		for(i = 0; i < node->nchildren; i++) {
 			FsNode *child = node->children[i];
-			int width;
-			
-			/* Last child gets remaining space, others get proportional space */
-			if(i == node->nchildren - 1) {
-				width = remaining;
-			} else {
-				width = (int)((double)child->size / total_size * Dx(avail));
-				if(width < MINBOX && node->nchildren > 1)
-					width = MINBOX;
-				if(width > remaining - (node->nchildren - i - 1) * MINBOX)
-					width = remaining - (node->nchildren - i - 1) * MINBOX;
-			}
-			
-			/* Create the rectangle for this child */
-			r = Rect(pos, avail.min.y, pos + width, avail.max.y);
-			child->bounds = r;
-			
-			/* Update position and remaining space */
-			pos += width;
-			remaining -= width;
-			
-			/* Recursively layout children */
 			if(child->isdir && child->nchildren > 0) {
-				Rectangle inset = insetrect(r, MARGIN);
-				layout_treemap(child, inset);
+				Rectangle inset = insetrect(child->bounds, MARGIN);
+				if(Dx(inset) > MINBOX && Dy(inset) > MINBOX) {
+					layout_treemap(child, inset, depth + 1);
+				}
 			}
 		}
 	} else {
-		/* Vertical layout */
-		pos = avail.min.y;
-		remaining = Dy(avail);
+		/* For deeper levels, only process larger nodes to avoid visual clutter */
+		int limit = 0; /* Start with root level count */
 		
-		for(i = 0; i < node->nchildren; i++) {
+		/* Progressively increase the size threshold at deeper levels */
+		double size_threshold = 0;
+		if(depth == 2) size_threshold = total_size * 0.05; /* 5% of parent's size */
+		else if(depth == 3) size_threshold = total_size * 0.10; /* 10% of parent's size */
+		else if(depth == 4) size_threshold = total_size * 0.15; /* 15% of parent's size */
+		else size_threshold = total_size * 0.20; /* 20% of parent's size */
+		
+		for(i = 0; i < node->nchildren && limit < 5; i++) {
 			FsNode *child = node->children[i];
-			int height;
-			
-			/* Last child gets remaining space, others get proportional space */
-			if(i == node->nchildren - 1) {
-				height = remaining;
-			} else {
-				height = (int)((double)child->size / total_size * Dy(avail));
-				if(height < MINBOX && node->nchildren > 1)
-					height = MINBOX;
-				if(height > remaining - (node->nchildren - i - 1) * MINBOX)
-					height = remaining - (node->nchildren - i - 1) * MINBOX;
-			}
-			
-			/* Create the rectangle for this child */
-			r = Rect(avail.min.x, pos, avail.max.x, pos + height);
-			child->bounds = r;
-			
-			/* Update position and remaining space */
-			pos += height;
-			remaining -= height;
-			
-			/* Recursively layout children */
-			if(child->isdir && child->nchildren > 0) {
-				Rectangle inset = insetrect(r, MARGIN);
-				layout_treemap(child, inset);
+			if(child->isdir && child->nchildren > 0 && child->size >= size_threshold) {
+				Rectangle inset = insetrect(child->bounds, MARGIN);
+				if(Dx(inset) > MINBOX && Dy(inset) > MINBOX) {
+					layout_treemap(child, inset, depth + 1);
+					limit++;
+				}
 			}
 		}
+	}
+}
+
+/* Layout nodes in a horizontal pattern */
+void
+layout_horizontal(FsNode *node, Rectangle avail, double total_size)
+{
+	int i;
+	int pos;
+	int remaining;
+	int width;
+	FsNode *child;
+	Rectangle r;
+	
+	pos = avail.min.x;
+	remaining = Dx(avail);
+	
+	/* Use threshold to ensure minimum rectangle sizes */
+	int min_width = MINBOX;
+	int available_children = node->nchildren;
+	
+	/* If we can't fit all children with minimum size, limit how many we show */
+	if(remaining < available_children * min_width) {
+		available_children = remaining / min_width;
+		if(available_children < 1)
+			available_children = 1;
+	}
+	
+	for(i = 0; i < node->nchildren; i++) {
+		child = node->children[i];
+		
+		/* Skip tiny nodes if we're short on space */
+		if(i >= available_children) {
+			child->bounds = Rect(0, 0, 0, 0); /* Zero-sized rectangle */
+			continue;
+		}
+		
+		/* Last child gets remaining space, others get proportional space */
+		if(i == available_children - 1) {
+			width = remaining;
+		} else {
+			width = (int)((double)child->size / total_size * Dx(avail));
+			if(width < min_width)
+				width = min_width;
+			if(width > remaining - (available_children - i - 1) * min_width)
+				width = remaining - (available_children - i - 1) * min_width;
+		}
+		
+		/* Ensure width is positive */
+		if(width <= 0)
+			width = 1;
+		
+		/* Create the rectangle for this child */
+		r = Rect(pos, avail.min.y, pos + width, avail.max.y);
+		
+		/* Ensure rectangle is within parent bounds */
+		if(r.max.x > avail.max.x)
+			r.max.x = avail.max.x;
+		
+		child->bounds = r;
+		
+		/* Update position and remaining space */
+		pos += width;
+		remaining -= width;
+		
+		/* Stop if we run out of space */
+		if(remaining <= 0)
+			break;
+	}
+}
+
+/* Layout nodes in a vertical pattern */
+void
+layout_vertical(FsNode *node, Rectangle avail, double total_size)
+{
+	int i;
+	int pos;
+	int remaining;
+	int height;
+	FsNode *child;
+	Rectangle r;
+	
+	pos = avail.min.y;
+	remaining = Dy(avail);
+	
+	/* Use threshold to ensure minimum rectangle sizes */
+	int min_height = MINBOX;
+	int available_children = node->nchildren;
+	
+	/* If we can't fit all children with minimum size, limit how many we show */
+	if(remaining < available_children * min_height) {
+		available_children = remaining / min_height;
+		if(available_children < 1)
+			available_children = 1;
+	}
+	
+	for(i = 0; i < node->nchildren; i++) {
+		child = node->children[i];
+		
+		/* Skip tiny nodes if we're short on space */
+		if(i >= available_children) {
+			child->bounds = Rect(0, 0, 0, 0); /* Zero-sized rectangle */
+			continue;
+		}
+		
+		/* Last child gets remaining space, others get proportional space */
+		if(i == available_children - 1) {
+			height = remaining;
+		} else {
+			height = (int)((double)child->size / total_size * Dy(avail));
+			if(height < min_height)
+				height = min_height;
+			if(height > remaining - (available_children - i - 1) * min_height)
+				height = remaining - (available_children - i - 1) * min_height;
+		}
+		
+		/* Ensure height is positive */
+		if(height <= 0)
+			height = 1;
+		
+		/* Create the rectangle for this child */
+		r = Rect(avail.min.x, pos, avail.max.x, pos + height);
+		
+		/* Ensure rectangle is within parent bounds */
+		if(r.max.y > avail.max.y)
+			r.max.y = avail.max.y;
+		
+		child->bounds = r;
+		
+		/* Update position and remaining space */
+		pos += height;
+		remaining -= height;
+		
+		/* Stop if we run out of space */
+		if(remaining <= 0)
+			break;
 	}
 }
 
@@ -481,31 +636,168 @@ void
 draw_node(FsNode *node, int highlight_it)
 {
 	Rectangle r;
+	int depth;
+	FsNode *parent;
+	char count[32];
+	char size_str[32];
+	char display_name[256];
+	int text_y;
+	int border_thickness;
+	int max_text_width;
+	
+	if(node == nil)
+		return;
 	
 	/* Get the node's bounds */
 	r = node->bounds;
 	
-	/* Skip if rectangle is too small or invalid */
+	/* Skip if rectangle is too small, invalid, or zero-sized */
 	if(Dx(r) <= 0 || Dy(r) <= 0)
 		return;
 	
+	/* Calculate recursive depth for coloring */
+	depth = 0;
+	parent = node->parent;
+	while(parent != nil && depth < MAX_DEPTH_LEVEL - 1) {
+		depth++;
+		parent = parent->parent;
+	}
+	
 	/* Draw filled rectangle with appropriate color */
-	if(highlight_it)
+	if(highlight_it) {
+		/* For highlighted items, draw background in highlight color */
 		draw(screen, r, highlight, nil, ZP);
-	else
-		draw(screen, r, node->color, nil, ZP);
+	} else if(node->isdir) {
+		/* Use depth-based color gradient for directories */
+		draw(screen, r, depth_colors[depth % 8], nil, ZP);
+	} else {
+		draw(screen, r, file_color, nil, ZP);
+	}
 	
-	/* Draw rectangle border */
-	border(screen, r, 1, border_color, ZP);
+	/* Determine border thickness based on item type and highlight state */
+	if(highlight_it) {
+		/* Thicker border for highlighted items */
+		border_thickness = 3;
+	} else if(node->isdir) {
+		/* Slightly thicker border for directories to make them more distinct */
+		border_thickness = 2;
+	} else {
+		/* Normal border for files */
+		border_thickness = 1;
+	}
 	
-	/* No text labels in treemap for cleaner visualization */
+	/* Draw appropriate border */
+	border(screen, r, border_thickness, border_color, ZP);
+	
+	/* Add an inner border for highlighted items for extra emphasis */
+	if(highlight_it) {
+		Rectangle inner = insetrect(r, border_thickness);
+		if(Dx(inner) > 6 && Dy(inner) > 6) {
+			border(screen, inner, 1, highlight, ZP);
+		}
+	}
+	
+	/* Calculate maximum text width to fit inside the rectangle */
+	max_text_width = Dx(r) - 2*(border_thickness + 3);
+	if(max_text_width <= 0)
+		return;  /* No space for text */
+	
+	/* Only draw text if rectangle is large enough */
+	if(Dx(r) > LABEL_THRESHOLD && Dy(r) > LABEL_THRESHOLD) {
+		/* Truncate filename if needed and add ellipsis */
+		strecpy(display_name, display_name+sizeof(display_name), node->name);
+		truncate_string(display_name, font, max_text_width);
+		
+		/* Draw filename for large enough rectangles */
+		text_y = r.min.y + border_thickness + 3;
+		if(text_y + font->height <= r.max.y - 3) {
+			string(screen, Pt(r.min.x + border_thickness + 3, text_y), text_color, ZP, font, display_name);
+			
+			/* If it's a directory, show child count */
+			if(node->isdir) {
+				text_y += font->height + 2;
+				snprint(count, sizeof(count), "%d items", node->nchildren);
+				truncate_string(count, font, max_text_width);
+				
+				if(text_y + font->height <= r.max.y - 3) {
+					string(screen, Pt(r.min.x + border_thickness + 3, text_y), text_color, ZP, font, count);
+					
+					/* Show size information */
+					text_y += font->height + 2;
+					snprint(size_str, sizeof(size_str), "%s", format_size(node->size));
+					truncate_string(size_str, font, max_text_width);
+					
+					/* Only draw size if we have room */
+					if(text_y + font->height <= r.max.y - 3) {
+						string(screen, Pt(r.min.x + border_thickness + 3, text_y), text_color, ZP, font, size_str);
+					}
+				}
+			} else {
+				/* For files, just show size after name */
+				text_y += font->height + 2;
+				snprint(size_str, sizeof(size_str), "%s", format_size(node->size));
+				truncate_string(size_str, font, max_text_width);
+				
+				/* Only draw size if we have room */
+				if(text_y + font->height <= r.max.y - 3) {
+					string(screen, Pt(r.min.x + border_thickness + 3, text_y), text_color, ZP, font, size_str);
+				}
+			}
+		}
+	} else if(node->isdir && Dx(r) > MINBOX*2 && Dy(r) > MINBOX*2) {
+		/* For medium-sized directories, just show item count */
+		snprint(count, sizeof(count), "%d", node->nchildren);
+		truncate_string(count, font, max_text_width);
+		text_y = r.min.y + (Dy(r) - font->height)/2;
+		
+		/* Only draw if it fits vertically */
+		if(text_y >= r.min.y && text_y + font->height <= r.max.y) {
+			string(screen, Pt(r.min.x + border_thickness + 3, text_y), text_color, ZP, font, count);
+		}
+	}
 }
 
-/* Draw the treemap visualization (lower pane) */
+/* Truncate a string to fit the given width, adding ellipsis if needed */
+void
+truncate_string(char *s, Font *f, int max_width)
+{
+	int len, width;
+	char ellipsis[] = "...";
+	int ellipsis_width;
+	
+	if(s == nil || s[0] == '\0')
+		return;
+	
+	width = stringwidth(f, s);
+	if(width <= max_width)
+		return;  /* String fits, no truncation needed */
+	
+	ellipsis_width = stringwidth(f, ellipsis);
+	
+	/* If we can't even fit ellipsis, just truncate to empty string */
+	if(max_width < ellipsis_width) {
+		s[0] = '\0';
+		return;
+	}
+	
+	/* Try removing characters until string with ellipsis fits */
+	len = strlen(s);
+	while(len > 0) {
+		s[--len] = '\0';
+		width = stringwidth(f, s) + ellipsis_width;
+		if(width <= max_width) {
+			strcat(s, ellipsis);
+			return;
+		}
+	}
+}
+
+/* Draw the treemap visualization */
 void
 draw_treemap(void)
 {
 	int i;
+	Rectangle full_treemap;
 	
 	/* Fill treemap area with background */
 	draw(screen, treemap_rect, back, nil, ZP);
@@ -523,22 +815,60 @@ draw_treemap(void)
 		return;
 	}
 	
-	/* Layout the treemap starting from current node */
-	layout_treemap(current, insetrect(treemap_rect, MARGIN));
+	/* Calculate full treemap area with small margin */
+	full_treemap = insetrect(treemap_rect, MARGIN);
 	
-	/* Draw all visible nodes */
-	if(current->nchildren > 0) {
-		/* Draw children first */
-		for(i = 0; i < current->nchildren; i++) {
-			int highlight_this = (i == selected_list_idx);
-			draw_node(current->children[i], highlight_this);
-		}
-	} else {
+	/* For an empty directory, just show a message */
+	if(current->nchildren == 0) {
 		/* Draw message if no children */
 		int text_y = treemap_rect.min.y + (Dy(treemap_rect) / 2) + (font->height / 3);
 		string(screen, 
 			Pt(treemap_rect.min.x + PADDING, text_y), 
 			text_color, ZP, font, "Empty directory");
+		return;
+	}
+	
+	/* Layout the current directory's children directly within the treemap */
+	layout_treemap(current, full_treemap, 0);
+	
+	/* First, draw all direct children of the current directory */
+	for(i = 0; i < current->nchildren; i++) {
+		FsNode *child = current->children[i];
+		int highlight_this = (i == selected_list_idx);
+		draw_node(child, highlight_this);
+	}
+	
+	/* Then, recursively draw the contents of each child */
+	for(i = 0; i < current->nchildren; i++) {
+		FsNode *child = current->children[i];
+		if(child->isdir && child->nchildren > 0) {
+			/* Skip drawing this recursive node if it's the selected item 
+			 * (we already drew it with highlight) */
+			if(i != selected_list_idx) {
+				draw_node_recursive_contents(child);
+			}
+		}
+	}
+}
+
+/* Draw just the children of a node, not the node itself */
+void
+draw_node_recursive_contents(FsNode *node)
+{
+	int i;
+	
+	if(node == nil || !node->isdir || node->nchildren == 0)
+		return;
+	
+	/* Draw all children */
+	for(i = 0; i < node->nchildren; i++) {
+		FsNode *child = node->children[i];
+		draw_node(child, 0);
+		
+		/* Recursively draw grandchildren */
+		if(child->isdir && child->nchildren > 0) {
+			draw_node_recursive_contents(child);
+		}
 	}
 }
 
@@ -566,7 +896,9 @@ draw_ui(void)
 		
 		/* Draw title and version */
 		Point p = Pt(help_rect.min.x + 10, help_rect.min.y + 20);
-		string(screen, p, text_color, ZP, font, "Dufus 0.1 - Help");
+		char title[64];
+		snprint(title, sizeof(title), "Dufus %s - Help", VERSION);
+		string(screen, p, text_color, ZP, font, title);
 		
 		/* Draw help text with increased spacing between lines */
 		p.y += 25; /* Increased spacing */
@@ -730,6 +1062,7 @@ scan_directory(char *path, FsNode *parent)
 	/* Initialize parent size to zero - will accumulate total */
 	parent->size = 0;
 	
+	/* First pass: create nodes for all entries */
 	for(i = 0; i < ndirents; i++) {
 		/* Skip "." and ".." */
 		if(strcmp(dirents[i].name, ".") == 0 || strcmp(dirents[i].name, "..") == 0)
@@ -742,22 +1075,36 @@ scan_directory(char *path, FsNode *parent)
 		
 		FsNode *child = create_fsnode(dirents[i].name, fullpath, size, isdir, parent);
 		add_child(parent, child);
-		
-		/* Recursively scan subdirectories */
-		if(isdir) {
-			scan_directory(fullpath, child);
-			/* For directories, use the calculated size that includes subdirectories */
+	}
+	
+	/* Sort children by size (provisional) to process larger ones first */
+	sort_nodes_by_size(parent);
+	
+	/* Second pass: scan subdirectories and update sizes */
+	for(i = 0; i < parent->nchildren; i++) {
+		FsNode *child = parent->children[i];
+		if(child->isdir) {
+			/* Recursively scan subdirectories */
+			scan_directory(child->path, child);
+			/* Update the running total with this subdirectory's size */
 			total += child->size;
 		} else {
-			/* For files, just use the file size */
-			total += size;
+			/* For files, just add the file size */
+			total += child->size;
+		}
+		
+		/* Update status periodically to show progress */
+		if(i % 10 == 0) {
+			update_status("Scanning %s... (%d/%d)", path, i, parent->nchildren);
+			draw_footer();
+			flushimage(display, 1);
 		}
 	}
 	
 	/* Update parent's size to include all children */
 	parent->size = total;
 	
-	/* Sort children by size */
+	/* Re-sort children by size after all calculations */
 	sort_nodes_by_size(parent);
 	
 	free(dirents);
@@ -789,19 +1136,20 @@ find_node_at_point(FsNode *node, Point p)
 	if(node == nil || !ptinrect(p, treemap_rect))
 		return nil;
 	
-	/* Check if point is in this node */
+	/* First check if the point is within this node's bounds */
 	if(ptinrect(p, node->bounds)) {
-		/* Check children first */
+		/* Check children first - we want the most specific/innermost node */
 		for(i = 0; i < node->nchildren; i++) {
 			result = find_node_at_point(node->children[i], p);
 			if(result != nil)
 				return result;
 		}
 		
-		/* If not in any child, then it's in this node */
+		/* If no child contains the point, return this node */
 		return node;
 	}
 	
+	/* Point not in this node */
 	return nil;
 }
 
@@ -1088,23 +1436,54 @@ main(int argc, char *argv[])
 				}
 				
 				/* Left click in treemap view */
-				FsNode *clicked = find_node_at_point(current, ev.mouse.xy);
-				if(clicked != nil) {
-					/* Find index of clicked node in current's children */
-					int i;
-					for(i = 0; i < current->nchildren; i++) {
-						if(current->children[i] == clicked) {
-							selected_list_idx = i;
+				else if(ptinrect(ev.mouse.xy, treemap_rect)) {
+					FsNode *clicked = find_node_at_point(current, ev.mouse.xy);
+					if(clicked != nil) {
+						/* If clicked node is a direct child of current, select it */
+						if(clicked->parent == current) {
+							/* Find index of clicked node in current's children */
+							int i;
+							for(i = 0; i < current->nchildren; i++) {
+								if(current->children[i] == clicked) {
+									selected_list_idx = i;
+									
+									/* Adjust scroll to show selected item */
+									if(selected_list_idx < scroll_offset)
+										scroll_offset = selected_list_idx;
+									else if(selected_list_idx >= scroll_offset + visible_items)
+										scroll_offset = selected_list_idx - visible_items + 1;
+									
+									break;
+								}
+							}
+						}
+						/* If it's a descendant, navigate to its parent directory */
+						else if(clicked->parent != nil) {
+							FsNode *target = clicked;
+							int i;
+							
+							/* Navigate to the parent of the clicked node */
+							current = clicked->parent;
+							
+							/* Find the index of the clicked node in its parent's children */
+							for(i = 0; i < current->nchildren; i++) {
+								if(current->children[i] == target) {
+									selected_list_idx = i;
+									break;
+								}
+							}
 							
 							/* Adjust scroll to show selected item */
 							if(selected_list_idx < scroll_offset)
 								scroll_offset = selected_list_idx;
 							else if(selected_list_idx >= scroll_offset + visible_items)
 								scroll_offset = selected_list_idx - visible_items + 1;
-								
-							draw_ui();
-							break;
+							
+							/* Update status message */
+							update_status("Current: %s (%s)", current->path, format_size(current->size));
 						}
+						
+						draw_ui();
 					}
 				}
 			}

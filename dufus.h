@@ -1,8 +1,8 @@
 /* Application modes */
 enum {
-	NORMAL = 0,
-	NAVIGATING = 1,
-	ZOOMING = 2
+	APP_NORMAL = 0,
+	APP_NAVIGATING = 1,
+	APP_ZOOMING = 2
 };
 
 /* File size multipliers */
@@ -50,7 +50,15 @@ extern Image *accent;      /* Accent */
 extern Image *file_icon;   /* File icon image */
 extern Image *dir_icon;    /* Directory icon image */
 
-/* Function prototypes */
+/* Depth-based visualization colors */
+extern Image *depth_colors[8];
+
+/* Utility functions */
+int min(int a, int b);
+char* format_size(u64int size);
+void truncate_string(char *s, Font *f, int max_width);
+
+/* Drawing functions */
 void setup_draw(void);
 void init_colors(void);
 void calculate_layout(void);
@@ -58,23 +66,11 @@ void draw_header(void);
 void draw_footer(void);
 void draw_treemap(void);
 void draw_node(FsNode *node, int highlight_it);
+void draw_node_recursive_contents(FsNode *node);
 void draw_ui(void);
-void layout_treemap(FsNode *node, Rectangle avail);
-
-void scan_directory(char *path, FsNode *parent);
-FsNode* create_fsnode(char *name, char *path, u64int size, int isdir, FsNode *parent);
-void add_child(FsNode *parent, FsNode *child);
-void clear_fsnode(FsNode *node);
-void open_directory(char *path);
-
-void navigate(Rune key);
-void handle_key(Rune key);
-void update_status(char *fmt, ...);
-void eresized(int new);
-void usage(void);
-
-FsNode* find_node_at_point(FsNode *node, Point p);
-char* format_size(u64int size);
+void layout_treemap(FsNode *node, Rectangle avail, int depth);
+void layout_horizontal(FsNode *node, Rectangle avail, double total_size);
+void layout_vertical(FsNode *node, Rectangle avail, double total_size);
 
 /* File system operations */
 FsNode* create_fsnode(char *name, char *path, u64int size, int isdir, FsNode *parent);
@@ -85,9 +81,16 @@ void sort_nodes_by_size(FsNode *parent);
 void open_directory(char *path);
 
 /* Navigation functions */
+void navigate(Rune key);
+void handle_key(Rune key);
 void navigate_up(void);
 void navigate_to_selected(void);
-int find_list_item_at_point(Point p);
+void update_status(char *fmt, ...);
 
-/* UI functions */
-char* format_size(u64int size);
+/* Event handling */
+void eresized(int new);
+
+/* Utility */
+void usage(void);
+FsNode* find_node_at_point(FsNode *node, Point p);
+int find_list_item_at_point(Point p);

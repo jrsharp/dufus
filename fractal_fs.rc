@@ -1,0 +1,239 @@
+#!/bin/rc
+# fractal_fs.rc - Generate a fractal-like filesystem structure
+# This script creates a filesystem hierarchy that mimics a fractal pattern
+# with recursively nested directories of varying sizes and depths.
+
+# Usage: fractal_fs.rc [base_dir] [max_depth]
+# where base_dir is the directory to create the fractal structure in (default: fractal_demo)
+# and max_depth is the maximum recursion depth (default: 5)
+
+fn usage {
+	echo 'usage: fractal_fs.rc [base_dir] [max_depth]' >[1=2]
+	exit usage
+}
+
+fn cleanup {
+	echo 'Cleaning up...'
+	rm -rf $base
+	echo 'Done.'
+	exit
+}
+
+# Handle interrupts gracefully
+fn sigint {
+	echo 'Interrupted.'
+	cleanup
+}
+
+# Create a file of specified size
+fn create_file {
+	name=$1
+	size=$2
+	
+	# Create a file with the specified size (in KB)
+	dd -if /dev/zero -of $name -bs 1024 -count $size >[2]/dev/null
+}
+
+# Create a Sierpinski triangle-like directory structure
+fn create_sierpinski {
+	dir=$1
+	depth=$2
+	size=$3
+	
+	if(! ~ $dir /*) {
+		dir=`{pwd}^/$dir
+	}
+	
+	if(! test -d $dir) {
+		mkdir -p $dir
+	}
+	
+	# Base case - create files at the deepest level
+	if(~ $depth $max_depth) {
+		# Create a few files with varying sizes
+		create_file $dir/file1.dat `{echo $size / 4 | bc}
+		create_file $dir/file2.dat `{echo $size / 2 | bc}
+		create_file $dir/file3.dat $size
+		return
+	}
+	
+	# Create three subdirectories - the recursive nature creates fractal-like patterns
+	mkdir -p $dir/a $dir/b $dir/c
+	
+	# Create some files at this level
+	create_file $dir/data1.dat `{echo $size / 3 | bc}
+	create_file $dir/data2.dat `{echo $size / 6 | bc}
+	
+	# Recursively create subdirectories with varying sizes
+	# This creates a self-similar pattern at each level
+	create_sierpinski $dir/a `{echo $depth + 1 | bc} `{echo $size / 2 | bc}
+	create_sierpinski $dir/b `{echo $depth + 1 | bc} `{echo $size / 3 | bc}
+	create_sierpinski $dir/c `{echo $depth + 1 | bc} `{echo $size / 4 | bc}
+}
+
+# Create a Mandelbrot-like directory structure with variable branching 
+fn create_mandelbrot {
+	dir=$1
+	depth=$2
+	size=$3
+	
+	if(! ~ $dir /*) {
+		dir=`{pwd}^/$dir
+	}
+	
+	if(! test -d $dir) {
+		mkdir -p $dir
+	}
+	
+	# Base case - create files at the deepest level
+	if(~ $depth $max_depth) {
+		# Create a few files with varying sizes
+		create_file $dir/data.bin $size
+		return
+	}
+	
+	# Calculate number of branches based on depth
+	branches=`{echo 4 - $depth / 2 | bc}
+	if(~ $branches 0) {
+		branches=1
+	}
+	
+	# Create some files at this level with exponentially increasing sizes
+	create_file $dir/level_$depth.dat $size
+	
+	# Create branches subdirectories
+	for(i in `{seq 1 $branches}) {
+		subdir=$dir/branch_$i
+		mkdir -p $subdir
+		
+		# Calculate size for this branch - each gets progressively smaller
+		branch_size=`{echo $size / \( $i + 1 \) | bc}
+		
+		# Recursively fill the branch
+		create_mandelbrot $subdir `{echo $depth + 1 | bc} $branch_size
+	}
+}
+
+# Create a Koch snowflake-like directory pattern
+fn create_koch {
+	dir=$1
+	depth=$2
+	size=$3
+	
+	if(! ~ $dir /*) {
+		dir=`{pwd}^/$dir
+	}
+	
+	if(! test -d $dir) {
+		mkdir -p $dir
+	}
+	
+	# Base case
+	if(~ $depth $max_depth) {
+		create_file $dir/endpoint.dat $size
+		return
+	}
+	
+	# Create files at the current level
+	create_file $dir/segment.dat $size
+	
+	# Koch pattern has 4 segments per level
+	mkdir -p $dir/seg1 $dir/seg2 $dir/seg3 $dir/seg4
+	
+	# Each segment gets 1/3 the size (as in Koch curve)
+	segment_size=`{echo $size / 3 | bc}
+	
+	# Recursively create the pattern
+	create_koch $dir/seg1 `{echo $depth + 1 | bc} $segment_size
+	create_koch $dir/seg2 `{echo $depth + 1 | bc} $segment_size
+	create_koch $dir/seg3 `{echo $depth + 1 | bc} $segment_size
+	create_koch $dir/seg4 `{echo $depth + 1 | bc} $segment_size
+}
+
+# Create a Dragon curve-like directory structure
+fn create_dragon {
+	dir=$1
+	depth=$2
+	size=$3
+	angle=$4  # 0=right, 1=left, 2=up, 3=down
+	
+	if(! ~ $dir /*) {
+		dir=`{pwd}^/$dir
+	}
+	
+	if(! test -d $dir) {
+		mkdir -p $dir
+	}
+	
+	# Base case
+	if(~ $depth $max_depth) {
+		create_file $dir/endpoint_$angle.dat $size
+		return
+	}
+	
+	# Create a file at this level
+	create_file $dir/turn_$angle.dat $size
+	
+	# Dragon curve makes turns - we'll represent with subdirectories
+	# The angle determines which direction we're heading
+	mkdir -p $dir/right $dir/left
+	
+	# Calculate new sizes - each level gets half the size
+	new_size=`{echo $size / 2 | bc}
+	
+	# Calculate new angles for the dragon curve pattern
+	right_angle=`{echo \( $angle + 1 \) % 4 | bc}
+	left_angle=`{echo \( $angle + 3 \) % 4 | bc}
+	
+	# Recursively create the pattern
+	create_dragon $dir/right `{echo $depth + 1 | bc} $new_size $right_angle
+	create_dragon $dir/left `{echo $depth + 1 | bc} $new_size $left_angle
+}
+
+# Main program
+
+if(~ $#* 0) {
+	base=fractal_demo
+	max_depth=5
+} else if(~ $#* 1) {
+	base=$1
+	max_depth=5
+} else if(~ $#* 2) {
+	base=$1
+	max_depth=$2
+} else {
+	usage
+}
+
+if(! ~ $max_depth [0-9]*) {
+	echo 'Error: max_depth must be a number' >[1=2]
+	exit 'bad max_depth'
+}
+
+echo 'Creating fractal filesystem structure in '$base'...'
+
+# Clean up any existing directory
+test -d $base && rm -rf $base
+
+# Create main directory structure
+mkdir -p $base
+mkdir -p $base/sierpinski $base/mandelbrot $base/koch $base/dragon
+
+# Create different fractal patterns
+echo 'Generating Sierpinski triangle pattern...'
+create_sierpinski $base/sierpinski 1 256
+
+echo 'Generating Mandelbrot-like pattern...'
+create_mandelbrot $base/mandelbrot 1 512
+
+echo 'Generating Koch snowflake pattern...'
+create_koch $base/koch 1 384
+
+echo 'Generating Dragon curve pattern...'
+create_dragon $base/dragon 1 320 0
+
+echo 'Fractal filesystem created successfully in '$base
+echo 'Run dufus on this directory to visualize the fractal patterns:'
+echo '  dufus '$base
+
+exit 

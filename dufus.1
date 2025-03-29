@@ -32,6 +32,8 @@ and icons for clear visual distinction.
 .B Treemap View
 A treemap representation where rectangles represent files and directories,
 with the size of each rectangle proportional to the file or directory size.
+The visualization employs enhanced layout algorithms that naturally express
+recursive directory structures and any fractal-like patterns that may exist.
 .PP
 .I Dufus
 adheres to Plan 9 design principles of simplicity and modularity, doing only 
@@ -47,7 +49,8 @@ and size information.
 .TP
 .B Treemap Visualization
 The lower pane showing files and directories as proportionally-sized rectangles.
-Directories and files are distinctly colored, and the selected item is highlighted.
+Directories are colored based on their depth in the file hierarchy, creating
+a natural representation of recursive structures.
 .TP
 .B Status Bar
 Shows current path and total size information at the bottom of the window.
@@ -88,25 +91,48 @@ Toggle help display
 .PP
 The visualization uses colors to differentiate between item types:
 .TP
-.B Light blue
-Directories (both in list and treemap)
+.B Depth-Based Gradient
+Directories are colored using a gradient based on their depth in the filesystem hierarchy,
+ranging from indigo (deepest) to red (shallowest)
 .TP
-.B White/light steel blue
-Files (in list and treemap respectively)
+.B Sky Blue
+Files are shown in a consistent color
 .TP
-.B Sky blue
+.B Gold
 Currently selected item
-.SH VISUAL ELEMENTS
+.SH VISUALIZATION DETAILS
 .PP
+The treemap visualization employs several techniques to effectively represent filesystem structures:
 .TP
-.B Directory Icon
-Folders are represented by a folder icon in the list
+.B Adaptive Layouts
+Layout patterns change based on directory depth and available space
 .TP
-.B File Icon
-Files are represented by a document icon in the list
+.B Spiral Layouts
+Some directory levels use spiral layouts for a more organic representation
 .TP
-.B Background Color
-Directories have a light blue background to further distinguish them from files
+.B Proportional Sizing
+All rectangles are sized proportionally to their disk usage
+.TP
+.B Recursive Depth Coloring
+Colors change based on the recursive depth in the filesystem
+.TP
+.B Metadata Display
+Additional information displayed for larger directory rectangles
+.SH FRACTAL FILESYSTEM GENERATOR
+.PP
+A companion script,
+.B fractal_fs.rc
+, can be used to generate filesystem structures that mimic various fractal patterns.
+This provides an excellent demonstration of dufus's visualization capabilities.
+.TP
+.B Usage:
+.IP
+.EX
+fractal_fs.rc [base_dir] [max_depth]
+.EE
+.TP
+.B Patterns Generated:
+Sierpinski triangle, Mandelbrot-like, Koch snowflake, and Dragon curve directory structures
 .SH EXAMPLES
 .PP
 To analyze the current directory:
@@ -119,6 +145,13 @@ To analyze a specific directory:
 .IP
 .EX
 dufus /usr/glenda/docs
+.EE
+.PP
+To generate and visualize a fractal filesystem:
+.IP
+.EX
+fractal_fs.rc fractal_demo 5
+dufus fractal_demo
 .EE
 .SH SOURCE
 .B /sys/src/cmd/dufus
