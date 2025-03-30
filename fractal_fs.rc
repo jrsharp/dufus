@@ -40,35 +40,40 @@ fn create_sierpinski {
 	depth=$2
 	size=$3
 	
-	if(! ~ $dir /*) {
+	if(! ~ $dir /*)
 		dir=`{pwd}^/$dir
-	}
 	
-	if(! test -d $dir) {
+	if(! test -d $dir)
 		mkdir -p $dir
-	}
 	
 	# Base case - create files at the deepest level
 	if(~ $depth $max_depth) {
 		# Create a few files with varying sizes
-		create_file $dir/file1.dat `{echo $size / 4 | bc}
-		create_file $dir/file2.dat `{echo $size / 2 | bc}
+		size1=`{echo $size / 4 | hoc}
+		size2=`{echo $size / 2 | hoc}
+		create_file $dir/file1.dat $size1
+		create_file $dir/file2.dat $size2
 		create_file $dir/file3.dat $size
-		return
 	}
-	
-	# Create three subdirectories - the recursive nature creates fractal-like patterns
-	mkdir -p $dir/a $dir/b $dir/c
-	
-	# Create some files at this level
-	create_file $dir/data1.dat `{echo $size / 3 | bc}
-	create_file $dir/data2.dat `{echo $size / 6 | bc}
-	
-	# Recursively create subdirectories with varying sizes
-	# This creates a self-similar pattern at each level
-	create_sierpinski $dir/a `{echo $depth + 1 | bc} `{echo $size / 2 | bc}
-	create_sierpinski $dir/b `{echo $depth + 1 | bc} `{echo $size / 3 | bc}
-	create_sierpinski $dir/c `{echo $depth + 1 | bc} `{echo $size / 4 | bc}
+	if not {
+		# Create three subdirectories - the recursive nature creates fractal-like patterns
+		mkdir -p $dir/a $dir/b $dir/c
+		
+		# Create some files at this level
+		size1=`{echo $size / 3 | hoc}
+		size2=`{echo $size / 6 | hoc}
+		create_file $dir/data1.dat $size1
+		create_file $dir/data2.dat $size2
+		
+		# Recursively create subdirectories with varying sizes
+		next_depth=`{echo $depth + 1 | hoc}
+		sizea=`{echo $size / 2 | hoc}
+		sizeb=`{echo $size / 3 | hoc}
+		sizec=`{echo $size / 4 | hoc}
+		create_sierpinski $dir/a $next_depth $sizea
+		create_sierpinski $dir/b $next_depth $sizeb
+		create_sierpinski $dir/c $next_depth $sizec
+	}
 }
 
 # Create a Mandelbrot-like directory structure with variable branching 
@@ -77,40 +82,41 @@ fn create_mandelbrot {
 	depth=$2
 	size=$3
 	
-	if(! ~ $dir /*) {
+	if(! ~ $dir /*)
 		dir=`{pwd}^/$dir
-	}
 	
-	if(! test -d $dir) {
+	if(! test -d $dir)
 		mkdir -p $dir
-	}
 	
 	# Base case - create files at the deepest level
 	if(~ $depth $max_depth) {
 		# Create a few files with varying sizes
 		create_file $dir/data.bin $size
-		return
 	}
-	
-	# Calculate number of branches based on depth
-	branches=`{echo 4 - $depth / 2 | bc}
-	if(~ $branches 0) {
-		branches=1
-	}
-	
-	# Create some files at this level with exponentially increasing sizes
-	create_file $dir/level_$depth.dat $size
-	
-	# Create branches subdirectories
-	for(i in `{seq 1 $branches}) {
-		subdir=$dir/branch_$i
-		mkdir -p $subdir
+	if not {
+		# Calculate number of branches based on depth
+		branches=`{echo 4 - $depth / 2 | hoc}
+		if(~ $branches 0)
+			branches=1
 		
-		# Calculate size for this branch - each gets progressively smaller
-		branch_size=`{echo $size / \( $i + 1 \) | bc}
+		# Create some files at this level with exponentially increasing sizes
+		create_file $dir/level_$depth.dat $size
 		
-		# Recursively fill the branch
-		create_mandelbrot $subdir `{echo $depth + 1 | bc} $branch_size
+		# Create branches subdirectories
+		next_depth=`{echo $depth + 1 | hoc}
+		
+		i=1
+		while(test $i -le $branches) {
+			subdir=$dir/branch_$i
+			mkdir -p $subdir
+			
+			# Calculate size for this branch - each gets progressively smaller
+			branch_size=`{echo $size / $i+1 | hoc}
+			
+			# Recursively fill the branch
+			create_mandelbrot $subdir $next_depth $branch_size
+			i=`{echo $i + 1 | hoc}
+		}
 	}
 }
 
@@ -120,34 +126,33 @@ fn create_koch {
 	depth=$2
 	size=$3
 	
-	if(! ~ $dir /*) {
+	if(! ~ $dir /*)
 		dir=`{pwd}^/$dir
-	}
 	
-	if(! test -d $dir) {
+	if(! test -d $dir)
 		mkdir -p $dir
-	}
 	
 	# Base case
 	if(~ $depth $max_depth) {
 		create_file $dir/endpoint.dat $size
-		return
 	}
-	
-	# Create files at the current level
-	create_file $dir/segment.dat $size
-	
-	# Koch pattern has 4 segments per level
-	mkdir -p $dir/seg1 $dir/seg2 $dir/seg3 $dir/seg4
-	
-	# Each segment gets 1/3 the size (as in Koch curve)
-	segment_size=`{echo $size / 3 | bc}
-	
-	# Recursively create the pattern
-	create_koch $dir/seg1 `{echo $depth + 1 | bc} $segment_size
-	create_koch $dir/seg2 `{echo $depth + 1 | bc} $segment_size
-	create_koch $dir/seg3 `{echo $depth + 1 | bc} $segment_size
-	create_koch $dir/seg4 `{echo $depth + 1 | bc} $segment_size
+	if not {
+		# Create files at the current level
+		create_file $dir/segment.dat $size
+		
+		# Koch pattern has 4 segments per level
+		mkdir -p $dir/seg1 $dir/seg2 $dir/seg3 $dir/seg4
+		
+		# Each segment gets 1/3 the size (as in Koch curve)
+		segment_size=`{echo $size / 3 | hoc}
+		next_depth=`{echo $depth + 1 | hoc}
+		
+		# Recursively create the pattern
+		create_koch $dir/seg1 $next_depth $segment_size
+		create_koch $dir/seg2 $next_depth $segment_size
+		create_koch $dir/seg3 $next_depth $segment_size
+		create_koch $dir/seg4 $next_depth $segment_size
+	}
 }
 
 # Create a Dragon curve-like directory structure
@@ -157,54 +162,55 @@ fn create_dragon {
 	size=$3
 	angle=$4  # 0=right, 1=left, 2=up, 3=down
 	
-	if(! ~ $dir /*) {
+	if(! ~ $dir /*)
 		dir=`{pwd}^/$dir
-	}
 	
-	if(! test -d $dir) {
+	if(! test -d $dir)
 		mkdir -p $dir
-	}
 	
 	# Base case
 	if(~ $depth $max_depth) {
 		create_file $dir/endpoint_$angle.dat $size
-		return
 	}
-	
-	# Create a file at this level
-	create_file $dir/turn_$angle.dat $size
-	
-	# Dragon curve makes turns - we'll represent with subdirectories
-	# The angle determines which direction we're heading
-	mkdir -p $dir/right $dir/left
-	
-	# Calculate new sizes - each level gets half the size
-	new_size=`{echo $size / 2 | bc}
-	
-	# Calculate new angles for the dragon curve pattern
-	right_angle=`{echo \( $angle + 1 \) % 4 | bc}
-	left_angle=`{echo \( $angle + 3 \) % 4 | bc}
-	
-	# Recursively create the pattern
-	create_dragon $dir/right `{echo $depth + 1 | bc} $new_size $right_angle
-	create_dragon $dir/left `{echo $depth + 1 | bc} $new_size $left_angle
+	if not {
+		# Create a file at this level
+		create_file $dir/turn_$angle.dat $size
+		
+		# Dragon curve makes turns - we'll represent with subdirectories
+		# The angle determines which direction we're heading
+		mkdir -p $dir/right $dir/left
+		
+		# Calculate new sizes - each level gets half the size
+		new_size=`{echo $size / 2 | hoc}
+		next_depth=`{echo $depth + 1 | hoc}
+		
+		# Calculate new angles for the dragon curve pattern
+		right_angle=`{echo $angle+1 % 4 | hoc}
+		left_angle=`{echo $angle+3 % 4 | hoc}
+		
+		# Recursively create the pattern
+		create_dragon $dir/right $next_depth $new_size $right_angle
+		create_dragon $dir/left $next_depth $new_size $left_angle
+	}
 }
 
 # Main program
 
-if(~ $#* 0) {
-	base=fractal_demo
-	max_depth=5
-} else if(~ $#* 1) {
+# Set defaults
+base=fractal_demo
+max_depth=5
+
+# Parse arguments
+if(~ $#* 1)
 	base=$1
-	max_depth=5
-} else if(~ $#* 2) {
+if(~ $#* 2) {
 	base=$1
 	max_depth=$2
-} else {
-	usage
 }
+if(! ~ $#* 0 1 2)
+	usage
 
+# Ensure max_depth is a number
 if(! ~ $max_depth [0-9]*) {
 	echo 'Error: max_depth must be a number' >[1=2]
 	exit 'bad max_depth'
@@ -213,7 +219,8 @@ if(! ~ $max_depth [0-9]*) {
 echo 'Creating fractal filesystem structure in '$base'...'
 
 # Clean up any existing directory
-test -d $base && rm -rf $base
+if(test -d $base)
+	rm -rf $base
 
 # Create main directory structure
 mkdir -p $base
